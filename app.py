@@ -1,46 +1,34 @@
 from flask import Flask, request
-import os
 import requests
+import os
 
-app = Flask(name)
+app = Flask(__name__)
 
-def kirim_balasan(chat_id, message_id, text, token):
-    url = f"https://api.telegram.org/bot{token}/editMessageText"
-    payload = {
-        "chat_id": chat_id,
-        "message_id": message_id,
-        "text": text,
-        "parse_mode": "Markdown"
-    }
-    requests.post(url, json=payload)
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+TELEGRAM_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
 
-@app.route("/webhook", methods=["POST"])
+@app.route('/webhook', methods=['POST'])
 def handle_webhook():
     data = request.json
     print("📩 Webhook diterima:", data)
 
-    if "callback_query" in data:
-        callback = data["callback_query"]
-        data_cb = callback.get("data", "")
-        chat_id = callback["message"]["chat"]["id"]
-        message_id = callback["message"]["message_id"]
+    if 'message' in data:
+        chat_id = data['message']['chat']['id']
+        text = data['message'].get('text', '')
 
-        token = os.getenv("TELEGRAM_TOKEN")
-        if not token:
-            print("❌ TELEGRAM_TOKEN tidak ditemukan!")
-            return "Token tidak tersedia", 400
-
-        if data_cb.startswith("EXECUTE"):
-            try:
-                _, symbol, sinyal, conf, harga = data_cb.split("|")
-                kirim_balasan(chat_id, message_id, f"✅ Eksekusi untuk *{symbol}* arah *{sinyal}* dengan confidence *{conf}%*", token)
-            except Exception as e:
-                print("❌ Gagal parsing EXECUTE:", e)
-        elif data_cb.startswith("IGNORE"):
-            try:
-                _, symbol = data_cb.split("|")
-                kirim_balasan(chat_id, message_id, f"🚫 Entry *{symbol}* telah diabaikan.", token)
-            except Exception as e:
-                print("❌ Gagal parsing IGNORE:", e)
+        reply = f"Halo 👋 Kamu mengirim: {text}"
+        kirim_balasan(chat_id, reply)
 
     return "OK", 200
+
+def kirim_balasan(chat_id, text):
+    payload = {
+        'chat_id': chat_id,
+        'text': text
+    }
+    response = requests.post(TELEGRAM_URL, json=payload)
+    print("✅ Balasan dikirim:", response.json())
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
